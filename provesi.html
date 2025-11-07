@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provesi SAS - Monitor ASR</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #monitor-panel {
+            width: 90%;
+            max-width: 600px;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        /* --- ESTADO DE ALERTA (CAÍDO) --- */
+        .status-error {
+            background-color: #fff0f0;
+            border-left: 10px solid #d93025;
+        }
+        .status-error h1 {
+            color: #d93025;
+        }
+        .status-error .icon {
+            font-size: 50px;
+            animation: pulse-error 1.5s infinite;
+        }
+        .status-error .message {
+            font-size: 1.2em;
+            color: #d93025;
+            font-weight: 700;
+        }
+
+        /* --- ESTADO NORMAL (SALUDABLE) --- */
+        .status-ok {
+            background-color: #f0fff4;
+            border-left: 10px solid #34a853;
+        }
+        .status-ok .icon {
+            font-size: 50px;
+            color: #34a853;
+        }
+        .status-ok .message {
+            font-size: 1.2em;
+            color: #333;
+            font-weight: 700;
+        }
+        
+        @keyframes pulse-error {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="monitor-panel">
+        </div>
+
+    <script>
+        // --- 1. CONFIGURACIÓN ---
+        const KONG_IP = "18.212.213.45"; // Asegúrate de que esta sea tu IP de Kong
+        const API_ENDPOINT = `http://${KONG_IP}:8000/alarms/`;
+
+        // --- 2. ELEMENTOS HTML ---
+        const panel = document.getElementById('monitor-panel');
+
+        const OK_HTML = `
+            <div class="icon">✅</div>
+            <h1>Panel de Bodega - Provesi SAS</h1>
+            <p class="message">Sistema Operativo | Última actualización: ${new Date().toLocaleTimeString('es-CO')}</p>
+            
+            <div style="margin-top: 30px; text-align: left;">
+                <h2 style="color: #34a853; font-size: 1.3em; border-bottom: 2px solid #34a853; padding-bottom: 10px;">📊 Resumen de Inventario</h2>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
+                    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 2em; font-weight: bold; color: #2e7d32;">24</div>
+                        <div style="color: #555;">Pedidos Pendientes</div>
+                    </div>
+                    <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ef6c00;">8</div>
+                        <div style="color: #555;">Stock Bajo</div>
+                    </div>
+                </div>
+
+                <h2 style="color: #1976d2; font-size: 1.3em; border-bottom: 2px solid #1976d2; padding-bottom: 10px; margin-top: 25px;">🔥 Productos Más Solicitados</h2>
+                <ul style="list-style: none; padding: 0; margin-top: 15px;">
+                    <li style="padding: 10px; background: #f5f5f5; margin-bottom: 8px; border-radius: 5px; display: flex; justify-content: space-between;">
+                        <span>🪖 Cascos de Seguridad</span>
+                        <span style="font-weight: bold; color: #34a853;">En stock: 145</span>
+                    </li>
+                    <li style="padding: 10px; background: #f5f5f5; margin-bottom: 8px; border-radius: 5px; display: flex; justify-content: space-between;">
+                        <span>🧤 Guantes Anti-corte</span>
+                        <span style="font-weight: bold; color: #34a853;">En stock: 89</span>
+                    </li>
+                    <li style="padding: 10px; background: #f5f5f5; margin-bottom: 8px; border-radius: 5px; display: flex; justify-content: space-between;">
+                        <span>🦺 Chalecos Reflectivos</span>
+                        <span style="font-weight: bold; color: #f57c00;">En stock: 12</span>
+                    </li>
+                    <li style="padding: 10px; background: #f5f5f5; margin-bottom: 8px; border-radius: 5px; display: flex; justify-content: space-between;">
+                        <span>👢 Botas Punta Acero</span>
+                        <span style="font-weight: bold; color: #34a853;">En stock: 67</span>
+                    </li>
+                </ul>
+
+                <div style="margin-top: 25px; padding: 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #1976d2;">
+                    <strong style="color: #1565c0;">💡 Nota:</strong> Recuerda revisar las ubicaciones en el pasillo C para los chalecos reflectivos.
+                </div>
+            </div>
+        `;
+
+        const ERROR_HTML = `
+            <div class="icon">⚠️</div>
+            <h1>¡SISTEMA CAÍDO!</h1>
+            <p class="message">Se detectó una falla. Contacte al administrador.</p>
+        `;
+
+        // --- 3. LÓGICA DE REVISIÓN (CORREGIDA) ---
+        async function checkSystemStatus() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(API_ENDPOINT, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                // Caso de Error 1: Falla real (503, 504, etc.)
+                if (!response.ok) {
+                    throw new Error(`El sistema no está disponible: ${response.status}`);
+                }
+
+                // Si la respuesta es OK (2xx), revisamos si es HTML (bueno) o JSON (malo)
+                const contentType = response.headers.get("content-type");
+
+                if (contentType && contentType.includes("application/json")) {
+                    const data = await response.json();
+                    // Caso de Error 2: Circuito abierto (JSON de Kong)
+                    if (data && data.message && data.message.includes("failure to get a peer")) {
+                        throw new Error('Circuito abierto detectado');
+                    }
+                } else if (contentType && contentType.includes("text/html")) {
+                    // Caso Saludable: Recibimos la página HTML de Django
+                    setPanelStatus('ok');
+                    return; // ¡Todo bien!
+                }
+                
+                // Si es JSON pero no es el error de Kong, asumimos que está bien
+                setPanelStatus('ok');
+
+            } catch (error) {
+                // Cualquier error (Timeout, 503, JSON de Kong)
+                console.error(error);
+                setPanelStatus('error');
+            }
+        }
+
+        function setPanelStatus(status) {
+            if (status === 'ok') {
+                panel.innerHTML = OK_HTML;
+                panel.className = 'status-ok';
+            } else {
+                panel.innerHTML = ERROR_HTML;
+                panel.className = 'status-error';
+            }
+        }
+
+        // --- 4. INICIAR EL MONITOR ---
+        setInterval(checkSystemStatus, 3000);
+        checkSystemStatus();
+
+    </script>
+</body>
+</html>
